@@ -283,11 +283,11 @@ client.on("interactionCreate", async (interaction) => {
                             content: "삭제완료",
                             ephemeral: true
                         });
-                        i.deleteReply()
+                        interact.deleteReply()
                     })
                     closeHelpCollector.on("end", () => {
                         if (closed) return
-                        i.deleteReply()
+                        interact.deleteReply()
                     })
                 }
             });
@@ -328,11 +328,11 @@ client.on("interactionCreate", async (interaction) => {
                 componentType: 'SELECT_MENU',
                 time: 20000
             });
-            collector.on('collect', async i => {
-                if (i.isSelectMenu()) {
-                    if (i.user.id != interaction.user.id || i.channel.id != interaction.channel.id || i.customId != "post_menu") return
-                    var id = i.customId;
-                    var value = i.values;
+            collector.on('collect', async interact => {
+                if (interact.isSelectMenu()) {
+                    if (interact.user.id != interaction.user.id || interact.channel.id != interaction.channel.id || interact.customId != "post_menu") return
+                    var id = interact.customId;
+                    var value = interact.values;
                     byUser = true;
                     collector.stop();
                     const closeButton = new MessageActionRow()
@@ -354,11 +354,11 @@ client.on("interactionCreate", async (interaction) => {
                                 filter,
                                 time: 500000
                             });
-                            postContentCollector.on("collect", (m) => {
+                            postContentCollector.on("collect", async (m) => {
                                 m.delete()
                                 con.query(`INSERT INTO \`malang_post\` (\`guildId\`, \`userId\`, \`subject\`, \`text\`) VALUES (${interaction.guild.id}, ${interaction.user.id},' ${option.getString("제목")}', '${m.content}')`, function (err, result) {
                                     if (err) throw err;
-                                    con.query(`SELECT * FROM \`malang_post\` WHERE \`guildId\` LIKE ${interaction.guild.id} AND \`subject\` LIKE '${option.getString("제목")}'`, function (err, result) {
+                                    con.query(`SELECT * FROM \`malang_post\` WHERE \`guildId\` LIKE ${interaction.guild.id} AND \`subject\` LIKE '${option.getString("제목")}'`, async function (err, result) {
                                         if (result.length == 0) {
                                             interaction.editReply({
                                                 content: "등록이 완료되었습니다",
@@ -379,7 +379,7 @@ client.on("interactionCreate", async (interaction) => {
                             break;
 
                         case "view-post":
-                            con.query(`SELECT * FROM \`malang_post\` WHERE \`guildId\` LIKE ${interaction.guild.id} AND \`subject\` LIKE '%${option.getString("제목")}%'`, function (err, result) {
+                            con.query(`SELECT * FROM \`malang_post\` WHERE \`guildId\` LIKE ${interaction.guild.id} AND \`subject\` LIKE '%${option.getString("제목")}%'`, async function (err, result) {
                                 if (err) throw err;
                                 if (result.length == 0) {
                                     const postList = new MessageEmbed()
@@ -389,22 +389,85 @@ client.on("interactionCreate", async (interaction) => {
                                         .setFooter("0개의 결과 검색됨", "https://t1.daumcdn.net/cfile/tistory/247248355950753B3C")
                                         .addField("목록", "검색결과가 없습니다")
                                         .setColor("RANDOM")
-                                    interaction.editReply({content: "검색완료", embeds: [postList], components: []})
+                                    interaction.editReply({
+                                        content: "검색완료",
+                                        embeds: [postList],
+                                        components: []
+                                    })
                                 } else {
                                     text = ``;
-                                    i = 1;
-                                    result.forEach(element => {
-                                        text = text + `\n${i}. ${element.subject} - <@!${element.userId}>`
-                                        i++;
+                                    int = new Array();
+                                    int[0] = 1;
+                                    result.some(element => {
+                                        int[1] = ((""+int[0]).slice(-1))*1
+                                        if (int[1] == 0) {
+                                            int[1] = 10;
+                                        }
+                                        if (int[0] >= 11) return true;
+                                        text = text + `\n${int[1]}. ${element.subject} - <@!${element.userId}>`
+                                        int[0] += 1;
                                     });
+                                    text = text.replaceAll(option.getString("제목"), "**" + option.getString("제목") + "**")
+                                    const postSelect = new MessageActionRow()
+                                        .addComponents(
+                                            new MessageSelectMenu()
+                                            .setCustomId('post_select')
+                                            .setPlaceholder('게시글이 선택되지 않았습니다')
+                                            .addOptions([{
+                                                label: '1',
+                                                description: '1번 선택',
+                                                value: '1',
+                                            }, {
+                                                label: '2',
+                                                description: '2번 선택',
+                                                value: '2',
+                                            }, {
+                                                label: '3',
+                                                description: '3번 선택',
+                                                value: '3',
+                                            }, {
+                                                label: '4',
+                                                description: '4번 선택',
+                                                value: '4',
+                                            }, {
+                                                label: '5',
+                                                description: '5번 선택',
+                                                value: '5',
+                                            }, {
+                                                label: '6',
+                                                description: '6번 선택',
+                                                value: '6',
+                                            }, {
+                                                label: '7',
+                                                description: '7번 선택',
+                                                value: '7',
+                                            }, {
+                                                label: '8',
+                                                description: '8번 선택',
+                                                value: '8',
+                                            }, {
+                                                label: '9',
+                                                description: '9번 선택',
+                                                value: '9',
+                                            }, {
+                                                label: '10',
+                                                description: '10번 선택',
+                                                value: '10',
+                                            }, ]),
+                                        );
                                     const postList = new MessageEmbed()
                                         .setTitle("게시글 검색 결과")
                                         .setDescription("밑의 번호로 게시글을 선택해주세요")
                                         .setTimestamp()
-                                        .setFooter(result.length+"개의 결과 검색됨", "https://t1.daumcdn.net/cfile/tistory/247248355950753B3C")
+                                        .setFooter(result.length + "개의 결과 검색됨", "https://t1.daumcdn.net/cfile/tistory/247248355950753B3C")
                                         .addField("목록", text)
                                         .setColor("RANDOM")
-                                    interaction.editReply({content: "검색완료", embeds: [postList], components: []})
+
+                                    interact.update({
+                                        content: "검색완료",
+                                        embeds: [postList],
+                                        components: [postSelect]
+                                    })
                                 }
                             });
                             break;
