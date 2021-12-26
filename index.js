@@ -181,9 +181,10 @@ client.on("interactionCreate", async (interaction) => {
                     ]),
                 );
             interaction.reply({
-                content: '도움말 선택지입니다 선택해주세요!',
+                content: '도움말 선택지입니다 선택해주세요! - ',
                 components: [selectList]
             })
+            interaction.channel.send("```혹시 오픈소스를 찾고 계시나요? 여기 있습니다!```\nhttps://github.com/yeonfish6040/k-t-d")
             evt.on("HELP_TIME_OVER", () => {
                 interaction.editReply({
                     content: "응답시간이 초과되었습니다",
@@ -330,6 +331,9 @@ client.on("interactionCreate", async (interaction) => {
             });
             collector.on('collect', async interact => {
                 if (interact.isSelectMenu()) {
+                    evt.on("ALL_STOP", () => {
+                        collector.stop()
+                    })
                     if (interact.user.id != interaction.user.id || interact.channel.id != interaction.channel.id || interact.customId != "post_menu") return
                     var id = interact.customId;
                     var value = interact.values;
@@ -355,6 +359,9 @@ client.on("interactionCreate", async (interaction) => {
                                 time: 500000
                             });
                             postContentCollector.on("collect", async (m) => {
+                                evt.on("ALL_STOP", () => {
+                                    postContentCollector.stop()
+                                })
                                 m.delete()
                                 con.query(`INSERT INTO \`malang_post\` (\`guildId\`, \`userId\`, \`subject\`, \`text\`) VALUES (${interaction.guild.id}, ${interaction.user.id},' ${option.getString("제목")}', '${m.content}')`, function (err, result) {
                                     if (err) throw err;
@@ -365,12 +372,14 @@ client.on("interactionCreate", async (interaction) => {
                                                 components: [],
                                                 ephemeral: true
                                             })
+                                            postContentCollector.stop();
                                         } else {
                                             interaction.editReply({
                                                 content: "해당 게시물이 이미 존재합니다",
                                                 components: [],
                                                 ephemeral: true
                                             })
+                                            postContentCollector.stop();
                                         }
                                     });
 
@@ -396,18 +405,115 @@ client.on("interactionCreate", async (interaction) => {
                                     })
                                 } else {
                                     text = ``;
-                                    int = new Array();
-                                    int[0] = 1;
-                                    result.some(element => {
-                                        int[1] = ((""+int[0]).slice(-1))*1
-                                        if (int[1] == 0) {
-                                            int[1] = 10;
+                                    int = 1;
+                                    results = result.slice(0, 10);
+                                    subjects = new Array();
+                                    evt.on("nextPostList", (evtRIntercation) => {
+                                        subjects = [];
+                                        if (int + 9 < result.length) {
+                                            results = result.slice(int - 1, int + 9);
+                                        } else {
+                                            results = result.slice(int - 1, result.length);
                                         }
-                                        if (int[0] >= 11) return true;
-                                        text = text + `\n${int[1]}. ${element.subject} - <@!${element.userId}>`
-                                        int[0] += 1;
+                                        text = ``;
+                                        results.some(element => {
+                                            subjects.push(element.subject)
+                                            user = client.users.cache.find(u => u.id == element.userId)
+                                            text = text + `\n${int}. ${element.subject.replaceAll(option.getString("제목"), "**" + option.getString("제목") + "**")} - ${user.tag}`
+                                            int++;
+                                        });
+                                        if (text == "") {
+                                            return evtRIntercation.reply({
+                                                content: "더 이상 앞으로 갈 수 없습니다",
+                                                ephemeral: true
+                                            });
+                                        }
+                                        const postList = new MessageEmbed()
+                                            .setTitle("게시글 검색 결과")
+                                            .setDescription("밑의 번호로 게시글을 선택해주세요")
+                                            .setTimestamp()
+                                            .setFooter(result.length + "개의 결과 검색됨", "https://t1.daumcdn.net/cfile/tistory/247248355950753B3C")
+                                            .addField("목록", text)
+                                            .setColor("RANDOM")
+                                        evtRIntercation.update({
+                                            content: "검색완료",
+                                            embeds: [postList]
+                                        })
+                                    })
+                                    evt.on("previousPostList", (evtRIntercation) => {
+                                        subjects = [];
+                                        if (int == 11) {
+                                            return evtRIntercation.reply({
+                                                content: "더 이상 뒤로 갈 수 없습니다",
+                                                ephemeral: true
+                                            });
+                                        }
+                                        results = result.slice(int - 11, int - 1)
+                                        int = int - 11
+                                        text = ``;
+                                        results.some(element => {
+                                            subjects.push(element.subject)
+                                            user = client.users.cache.find(u => u.id == element.userId)
+                                            text = text + `\n${int}. ${element.subject.replaceAll(option.getString("제목"), "**" + option.getString("제목") + "**")} - ${user.tag}`
+                                            int++;
+                                        });
+                                        const postList = new MessageEmbed()
+                                            .setTitle("게시글 검색 결과")
+                                            .setDescription("밑의 번호로 게시글을 선택해주세요")
+                                            .setTimestamp()
+                                            .setFooter(result.length + "개의 결과 검색됨", "https://t1.daumcdn.net/cfile/tistory/247248355950753B3C")
+                                            .addField("목록", text)
+                                            .setColor("RANDOM")
+                                        evtRIntercation.update({
+                                            content: "검색완료",
+                                            embeds: [postList]
+                                        })
+                                    })
+                                    results.some(element => {
+                                        user = client.users.cache.find(u => u.id == element.userId)
+                                        text = text + `\n${int}. ${element.subject.replaceAll(option.getString("제목"), "**" + option.getString("제목") + "**")} - ${user.tag}`
+                                        subjects.push(element.subject)
+                                        int++;
                                     });
-                                    text = text.replaceAll(option.getString("제목"), "**" + option.getString("제목") + "**")
+                                    evt.on("post_selected", async (evtGetInteraction) => {
+                                        target = parseInt(evtGetInteraction.values[0]);
+                                        subjt = subjects[target - 1]
+                                        if (!subjt) {
+                                            return evtGetInteraction.reply({
+                                                content: "유효하지 않은 값입니다",
+                                                ephemeral: true
+                                            })
+                                        }
+
+                                        con.query(`SELECT * FROM \`malang_post\` WHERE \`guildId\` = ${interaction.guild.id} AND \`subject\` = \"${subjt}\"`, async (err, result) => {
+                                            console.log(result);
+                                            console.log(subjt);
+                                            if (result.length == 0) {
+                                                return evtGetInteraction.reply("오류")
+                                            }
+                                            if (result[0].event) {
+                                                evtDate = result[0].event;
+                                            }else{
+                                                evtDate = "없음"
+                                            }
+                                            user = client.users.cache.find(u => u.id == result[0].userId)
+                                            const postResult = new MessageEmbed()
+                                                .setTitle(result[0].subject)
+                                                .setDescription(result[0].text)
+                                                .setTimestamp()
+                                                .setFooter(user.tag + " - idx:" + result[0].idx, user.displayAvatarURL())
+                                                .setColor("RANDOM")
+                                                .addField("일정", evtDate)
+                                            console.log(result);
+                                            evtGetInteraction.update({
+                                                content: "검색 완료",
+                                                embeds: [postResult],
+                                                components: []
+                                            })
+                                            evt.emit("ALL_STOP")
+
+                                        })
+                                    })
                                     const postSelect = new MessageActionRow()
                                         .addComponents(
                                             new MessageSelectMenu()
@@ -463,10 +569,53 @@ client.on("interactionCreate", async (interaction) => {
                                         .addField("목록", text)
                                         .setColor("RANDOM")
 
+                                    const postListButton = new MessageActionRow()
+                                        .addComponents(
+                                            btn = new MessageButton()
+                                            .setCustomId('previousPostListButton')
+                                            .setLabel('이전')
+                                            .setStyle('SECONDARY')
+                                        ).addComponents(
+                                            btn = new MessageButton()
+                                            .setCustomId('nextPostListButton')
+                                            .setLabel('다음')
+                                            .setStyle('SECONDARY')
+                                        );
                                     interact.update({
                                         content: "검색완료",
                                         embeds: [postList],
-                                        components: [postSelect]
+                                        components: [postSelect, postListButton]
+                                    })
+                                    const postMovePageButtonCollector = interaction.channel.createMessageComponentCollector({
+                                        componentType: 'BUTTON',
+                                        time: 300000
+                                    });
+                                    const postSelctMenuCollector = interaction.channel.createMessageComponentCollector({
+                                        componentType: 'SELECT_MENU',
+                                        time: 400000
+                                    });
+                                    postMovePageButtonCollector.on("collect", (pmpbcInteraction) => {
+                                        evt.on("ALL_STOP", () => {
+                                            postMovePageButtonCollector.stop()
+                                        })
+                                        if (pmpbcInteraction.channel.id != interaction.channel.id || pmpbcInteraction.user.id != interaction.user.id || (pmpbcInteraction.customId != "previousPostListButton" && pmpbcInteraction.customId != "nextPostListButton")) return;
+                                        switch (pmpbcInteraction.customId) {
+                                            case "previousPostListButton":
+                                                evt.emit("previousPostList", pmpbcInteraction)
+                                                break;
+
+                                            case "nextPostListButton":
+                                                evt.emit("nextPostList", pmpbcInteraction)
+                                                break;
+                                        }
+                                    })
+                                    postSelctMenuCollector.on("collect", (psmCollector) => {
+                                        evt.on("ALL_STOP", () => {
+                                            postSelctMenuCollector.stop()
+                                        })
+                                        if (psmCollector.channel.id != interaction.channel.id || psmCollector.user.id != interaction.user.id || psmCollector.customId != "post_select") return;
+                                        evt.emit("post_selected", psmCollector)
+                                        collector.stop()
                                     })
                                 }
                             });
@@ -478,6 +627,71 @@ client.on("interactionCreate", async (interaction) => {
                 if (byUser) return
                 evt.emit("POST_MENU_TIME_OVER")
             });
+        }
+        if (command === "일정") {
+            var regexExp = /([12]\d{3}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]))/
+            if (!regexExp.test(option.getString("date"))) {
+                return interaction.reply("날짜가 형식에 맞지 않습니다")
+            }
+            con.query(`SELECT * FROM \`malang_post\` WHERE \`idx\` LIKE ${option.getInteger("idx")} AND \`guildId\` LIKE ${interaction.guild.id}`, async (err, result) => {
+                if (result.length == 0) {
+                    return interaction
+                }
+                if (result[0].userId != interaction.user.id) {
+                    return interaction.reply("자신의 게시물에만 일정을 추가할 수 있습니다")
+                }
+            })
+            con.query(`UPDATE \`malang_post\` SET \`event\` = ${option.getString("date")} WHERE \`idx\` LIKE ${option.getInteger("idx")}`, (err, result) => {
+                if (!err) {
+                    interaction.reply("완료!")
+                }
+            })
+        }
+        if (command === "공지") {
+            if (("MANAGE_EVENTS" in interaction.member.permissions.toArray())) return interaction.reply({
+                content: "당신은 이 명령어를 사용할 권한이 없습니다\n권한:**MANAGE_EVENTS**",
+                ephemeral: true
+            })
+            con.query(`SELECT * FROM \`malang_notice\` WHERE \`guildId\` LIKE ${interaction.guild.id}`, async (err, result) => {
+                if (err) return interaction.reply("오류발생1")
+                if (result.length == 0) {
+                    con.query(`SELECT * FROM \`malang_post\` WHERE \`guildId\` LIKE ${interaction.guild.id} AND \`idx\` LIKE ${option.getInteger("idx")}`, async (err, result) => {
+                        if (err) interaction.reply("오류발생2")
+                        if (err) throw new Error(err);
+                        if (result.length == 0) {
+                            con.query(`INSERT INTO \`malang_notice\` (\`guildId\`, \`idx\`) VALUES (${interaction.guild.id}, ${option.getInteger("idx")})`, (err, result) => {
+                                if (err) interaction.reply("오류발생3")
+                                if (err) throw new Error(err);
+                                interaction.reply("등록되었습니다")
+                            })
+                        }
+                    })
+                } else {
+                    if (result[0].idx == option.getInteger("idx")) {
+                        con.query(`DELETE FROM malang_notice WHERE \`idx\` LIKE ${option.getInteger("idx")}`, (err, result) => {
+                            if (err) interaction.reply("오류발생4")
+                            if (err) throw new Error(err)
+                            return interaction.reply("공지를 내렸습니다")
+                        })
+
+                    }
+                    con.query(`SELECT * FROM \`malang_notice\` WHERE \`guildId\` LIKE ${interaction.guild.id} AND \`idx\` LIKE ${option.getInteger("idx")}`, async (err, result) => {
+                        if (err) interaction.reply("오류발생5")
+                        if (err) throw new Error(err);
+                        if (result.length != 0) {
+                            con.query(`DELETE FROM malang_notice WHERE \`idx\` LIKE ${option.getInteger("idx")}`, (err, result) => {
+                                if (err) interaction.reply("오류발생6")
+                                if (err) throw new Error(err)
+                                con.query(`INSERT INTO \`malang_notice\` (\`guildId\`, \`idx\`) VALUES (${interaction.guild.id}, ${option.getInteger("idx")})`, (err, result) => {
+                                    if (err) interaction.reply("오류발생7")
+                                    if (err) throw new Error(err)
+                                    interaction.reply("등록되었습니다")
+                                })
+                            })
+                        }
+                    })
+                }
+            })
         }
     }
 })
